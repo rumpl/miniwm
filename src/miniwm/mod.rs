@@ -52,8 +52,7 @@ impl MiniWM {
 
                 match event.get_type() {
                     xlib::MapRequest => {
-                        let event: xlib::XMapRequestEvent = From::from(event);
-                        xlib::XRaiseWindow(self.display, event.window);
+                        self.raise_window(event);
                     }
                     _ => {
                         println!("unknown event {:?}", event);
@@ -61,5 +60,10 @@ impl MiniWM {
                 }
             }
         }
+    }
+
+    fn raise_window(&self, event: xlib::XEvent) {
+        let event: xlib::XMapRequestEvent = From::from(event);
+        unsafe { xlib::XRaiseWindow(self.display, event.window) };
     }
 }
