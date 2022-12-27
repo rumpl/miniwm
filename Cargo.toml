@@ -1,0 +1,8 @@
+[package]
+name = "miniwm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Djordje Lukic <lukic.djordje@gmail.com>"]
+
+[dependencies]
+x11 = { version = "2.20.1", features = ["xlib"] }
