@@ -37,7 +37,7 @@ impl MiniWM {
             xlib::XSelectInput(
                 self.display,
                 xlib::XDefaultRootWindow(self.display),
-                xlib::SubstructureNotifyMask | xlib::SubstructureNotifyMask,
+                xlib::SubstructureRedirectMask,
             );
         }
 
@@ -45,6 +45,7 @@ impl MiniWM {
     }
 
     pub fn run(&self) {
+        println!("miniwm running");
         let mut event: xlib::XEvent = unsafe { zeroed() };
         loop {
             unsafe {
@@ -52,7 +53,7 @@ impl MiniWM {
 
                 match event.get_type() {
                     xlib::MapRequest => {
-                        self.raise_window(event);
+                        self.create_window(event);
                     }
                     _ => {
                         println!("unknown event {:?}", event);
@@ -62,8 +63,8 @@ impl MiniWM {
         }
     }
 
-    fn raise_window(&self, event: xlib::XEvent) {
+    fn create_window(&self, event: xlib::XEvent) {
         let event: xlib::XMapRequestEvent = From::from(event);
-        unsafe { xlib::XRaiseWindow(self.display, event.window) };
+        unsafe { xlib::XMapRaised(self.display, event.window) };
     }
 }
