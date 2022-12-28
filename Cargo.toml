@@ -6,4 +6,4 @@ authors = ["Djordje Lukic <lukic.djordje@gmail.com>"]
 
 [dependencies]
 thiserror = "1.0.38"
-x11 = { version = "2.20.1", features = ["xlib"] }
+x11 = { version = "2.20.1", features = ["xlib", "xinerama"] }

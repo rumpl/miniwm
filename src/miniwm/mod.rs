@@ -1,9 +1,10 @@
+use std::slice::from_raw_parts;
 use std::{
     ffi::{CString, NulError},
     mem::zeroed,
 };
 
-use x11::xlib;
+use x11::{xinerama, xlib};
 
 use thiserror::Error;
 
@@ -66,5 +67,23 @@ impl MiniWM {
     fn create_window(&self, event: xlib::XEvent) {
         let event: xlib::XMapRequestEvent = From::from(event);
         unsafe { xlib::XMapRaised(self.display, event.window) };
+
+        self.set_window_fullscreen(event.window);
+    }
+
+    fn set_window_fullscreen(&self, window: u64) {
+        unsafe {
+            let mut num: i32 = 0;
+            let screen_pointers = xinerama::XineramaQueryScreens(self.display, &mut num);
+            let screens = from_raw_parts(screen_pointers, num as usize).to_vec();
+            let screen = screens.get(0).unwrap();
+
+            xlib::XResizeWindow(
+                self.display,
+                window,
+                screen.width as u32,
+                screen.height as u32,
+            );
+        };
     }
 }
