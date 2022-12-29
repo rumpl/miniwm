@@ -66,9 +66,9 @@ impl MiniWM {
 
     fn create_window(&self, event: xlib::XEvent) -> Result<(), MiniWMError> {
         let event: xlib::XMapRequestEvent = From::from(event);
+        self.set_window_fullscreen(event.window)?;
         unsafe { xlib::XMapRaised(self.display, event.window) };
-
-        self.set_window_fullscreen(event.window)
+        Ok(())
     }
 
     fn set_window_fullscreen(&self, window: u64) -> Result<(), MiniWMError> {
