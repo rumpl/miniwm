@@ -11,7 +11,7 @@ pub enum MiniWMError {
     #[error("display not found")]
     DisplayNotFound,
 
-    #[error("display not found")]
+    #[error("screen not found")]
     ScreenNotFound,
 
     #[error("{0}")]
@@ -86,7 +86,7 @@ impl MiniWM {
                     screen.height as u32,
                 );
             } else {
-                return Err(MiniWMError::DisplayNotFound);
+                return Err(MiniWMError::ScreenNotFound);
             }
         };
         Ok(())
