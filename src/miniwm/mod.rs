@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ptr::null;
 use std::slice::from_raw_parts;
 use std::{ffi::NulError, mem::zeroed};
@@ -18,8 +19,13 @@ pub enum MiniWMError {
     NulString(#[from] NulError),
 }
 
+pub struct Rect(pub f32, pub f32, pub f32, pub f32);
+
+pub type Window = u64;
+
 pub struct MiniWM {
     display: *mut xlib::Display,
+    windows: BTreeMap<Window, Rect>,
 }
 
 impl MiniWM {
@@ -30,7 +36,10 @@ impl MiniWM {
             return Err(MiniWMError::DisplayNotFound);
         }
 
-        Ok(MiniWM { display })
+        Ok(MiniWM {
+            display,
+            windows: BTreeMap::new(),
+        })
     }
 
     pub fn init(&self) -> Result<(), MiniWMError> {
@@ -38,15 +47,14 @@ impl MiniWM {
             xlib::XSelectInput(
                 self.display,
                 xlib::XDefaultRootWindow(self.display),
-                xlib::SubstructureRedirectMask,
+                xlib::SubstructureRedirectMask | xlib::SubstructureNotifyMask,
             );
         }
 
         Ok(())
     }
 
-    pub fn run(&self) -> Result<(), MiniWMError> {
-        println!("miniwm running");
+    pub fn run(&mut self) -> Result<(), MiniWMError> {
         let mut event: xlib::XEvent = unsafe { zeroed() };
         loop {
             unsafe {
@@ -56,6 +64,9 @@ impl MiniWM {
                     xlib::MapRequest => {
                         self.create_window(event)?;
                     }
+                    xlib::UnmapNotify => {
+                        self.remove_window(event)?;
+                    }
                     _ => {
                         println!("unknown event {:?}", event);
                     }
@@ -64,14 +75,50 @@ impl MiniWM {
         }
     }
 
-    fn create_window(&self, event: xlib::XEvent) -> Result<(), MiniWMError> {
+    fn remove_window(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
+        let event: xlib::XUnmapEvent = From::from(event);
+        self.windows.remove(&event.window);
+        self.layout()
+    }
+
+    fn create_window(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
         let event: xlib::XMapRequestEvent = From::from(event);
-        self.set_window_fullscreen(event.window)?;
+        self.windows
+            .insert(event.window as Window, Rect(1.0, 1.0, 1.0, 1.0));
+        self.layout()?;
         unsafe { xlib::XMapRaised(self.display, event.window) };
+
         Ok(())
     }
 
-    fn set_window_fullscreen(&self, window: u64) -> Result<(), MiniWMError> {
+    fn layout(&mut self) -> Result<(), MiniWMError> {
+        if self.windows.is_empty() {
+            return Ok(());
+        }
+
+        let (width, height) = self.get_screen_size()?;
+
+        let win_width = width as usize / self.windows.len();
+
+        let mut start = 0;
+        self.windows.iter().for_each(|(window, _)| {
+            self.move_window(*window, start, 0_u32);
+            self.resize_window(*window, win_width as u32, height as u32);
+            start += win_width as u32;
+        });
+
+        Ok(())
+    }
+
+    fn move_window(&self, window: Window, x: u32, y: u32) {
+        unsafe { xlib::XMoveWindow(self.display, window, x as i32, y as i32) };
+    }
+
+    fn resize_window(&self, window: Window, width: u32, height: u32) {
+        unsafe { xlib::XResizeWindow(self.display, window, width, height) };
+    }
+
+    fn get_screen_size(&self) -> Result<(i16, i16), MiniWMError> {
         unsafe {
             let mut num: i32 = 0;
             let screen_pointers = xinerama::XineramaQueryScreens(self.display, &mut num);
@@ -79,16 +126,10 @@ impl MiniWM {
             let screen = screens.get(0);
 
             if let Some(screen) = screen {
-                xlib::XResizeWindow(
-                    self.display,
-                    window,
-                    screen.width as u32,
-                    screen.height as u32,
-                );
+                Ok((screen.width, screen.height))
             } else {
-                return Err(MiniWMError::ScreenNotFound);
+                Err(MiniWMError::ScreenNotFound)
             }
-        };
-        Ok(())
+        }
     }
 }

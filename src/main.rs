@@ -5,7 +5,7 @@ use std::error::Error;
 use miniwm::MiniWM;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let wm = MiniWM::new()?;
+    let mut wm = MiniWM::new()?;
 
     wm.init()?;
 
