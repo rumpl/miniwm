@@ -1,11 +1,10 @@
 use std::collections::BTreeSet;
+use std::mem::zeroed;
 use std::ptr::null;
 use std::slice::from_raw_parts;
-use std::{ffi::NulError, mem::zeroed};
-
-use x11::{xinerama, xlib};
 
 use thiserror::Error;
+use x11::{xinerama, xlib};
 
 #[derive(Error, Debug)]
 pub enum MiniWMError {
@@ -14,9 +13,6 @@ pub enum MiniWMError {
 
     #[error("screen not found")]
     ScreenNotFound,
-
-    #[error("{0}")]
-    NulString(#[from] NulError),
 }
 
 pub type Window = u64;
