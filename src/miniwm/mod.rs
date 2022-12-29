@@ -1,8 +1,6 @@
+use std::ptr::null;
 use std::slice::from_raw_parts;
-use std::{
-    ffi::{CString, NulError},
-    mem::zeroed,
-};
+use std::{ffi::NulError, mem::zeroed};
 
 use x11::{xinerama, xlib};
 
@@ -10,8 +8,11 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum MiniWMError {
-    #[error("display {0} not found")]
-    DisplayNotFound(String),
+    #[error("display not found")]
+    DisplayNotFound,
+
+    #[error("display not found")]
+    ScreenNotFound,
 
     #[error("{0}")]
     NulString(#[from] NulError),
@@ -22,12 +23,11 @@ pub struct MiniWM {
 }
 
 impl MiniWM {
-    pub fn new(display_name: &str) -> Result<Self, MiniWMError> {
-        let display: *mut xlib::Display =
-            unsafe { xlib::XOpenDisplay(CString::new(display_name)?.as_ptr()) };
+    pub fn new() -> Result<Self, MiniWMError> {
+        let display: *mut xlib::Display = unsafe { xlib::XOpenDisplay(null()) };
 
         if display.is_null() {
-            return Err(MiniWMError::DisplayNotFound(display_name.into()));
+            return Err(MiniWMError::DisplayNotFound);
         }
 
         Ok(MiniWM { display })
@@ -45,7 +45,7 @@ impl MiniWM {
         Ok(())
     }
 
-    pub fn run(&self) {
+    pub fn run(&self) -> Result<(), MiniWMError> {
         println!("miniwm running");
         let mut event: xlib::XEvent = unsafe { zeroed() };
         loop {
@@ -54,7 +54,7 @@ impl MiniWM {
 
                 match event.get_type() {
                     xlib::MapRequest => {
-                        self.create_window(event);
+                        self.create_window(event)?;
                     }
                     _ => {
                         println!("unknown event {:?}", event);
@@ -64,26 +64,31 @@ impl MiniWM {
         }
     }
 
-    fn create_window(&self, event: xlib::XEvent) {
+    fn create_window(&self, event: xlib::XEvent) -> Result<(), MiniWMError> {
         let event: xlib::XMapRequestEvent = From::from(event);
         unsafe { xlib::XMapRaised(self.display, event.window) };
 
-        self.set_window_fullscreen(event.window);
+        self.set_window_fullscreen(event.window)
     }
 
-    fn set_window_fullscreen(&self, window: u64) {
+    fn set_window_fullscreen(&self, window: u64) -> Result<(), MiniWMError> {
         unsafe {
             let mut num: i32 = 0;
             let screen_pointers = xinerama::XineramaQueryScreens(self.display, &mut num);
             let screens = from_raw_parts(screen_pointers, num as usize).to_vec();
-            let screen = screens.get(0).unwrap();
+            let screen = screens.get(0);
 
-            xlib::XResizeWindow(
-                self.display,
-                window,
-                screen.width as u32,
-                screen.height as u32,
-            );
+            if let Some(screen) = screen {
+                xlib::XResizeWindow(
+                    self.display,
+                    window,
+                    screen.width as u32,
+                    screen.height as u32,
+                );
+            } else {
+                return Err(MiniWMError::DisplayNotFound);
+            }
         };
+        Ok(())
     }
 }

@@ -5,12 +5,9 @@ use std::error::Error;
 use miniwm::MiniWM;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let display_name = std::env::var("DISPLAY")?;
-
-    let wm = MiniWM::new(&display_name)?;
+    let wm = MiniWM::new()?;
 
     wm.init()?;
-    wm.run();
 
-    Ok(())
+    Ok(wm.run()?)
 }
