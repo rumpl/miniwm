@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::ptr::null;
 use std::slice::from_raw_parts;
 use std::{ffi::NulError, mem::zeroed};
@@ -19,13 +19,11 @@ pub enum MiniWMError {
     NulString(#[from] NulError),
 }
 
-pub struct Rect(pub f32, pub f32, pub f32, pub f32);
-
 pub type Window = u64;
 
 pub struct MiniWM {
     display: *mut xlib::Display,
-    windows: BTreeMap<Window, Rect>,
+    windows: BTreeSet<Window>,
 }
 
 impl MiniWM {
@@ -38,7 +36,7 @@ impl MiniWM {
 
         Ok(MiniWM {
             display,
-            windows: BTreeMap::new(),
+            windows: BTreeSet::new(),
         })
     }
 
@@ -83,8 +81,7 @@ impl MiniWM {
 
     fn create_window(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
         let event: xlib::XMapRequestEvent = From::from(event);
-        self.windows
-            .insert(event.window as Window, Rect(1.0, 1.0, 1.0, 1.0));
+        self.windows.insert(event.window as Window);
         self.layout()?;
         unsafe { xlib::XMapRaised(self.display, event.window) };
 
@@ -101,7 +98,7 @@ impl MiniWM {
         let win_width = width as usize / self.windows.len();
 
         let mut start = 0;
-        self.windows.iter().for_each(|(window, _)| {
+        self.windows.iter().for_each(|window| {
             self.move_window(*window, start, 0_u32);
             self.resize_window(*window, win_width as u32, height as u32);
             start += win_width as u32;
