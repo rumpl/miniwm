@@ -1,7 +1,6 @@
-use std::collections::BTreeSet;
 use std::mem::zeroed;
 use std::ptr::null;
-use std::slice::from_raw_parts;
+use std::{collections::BTreeSet, slice};
 
 use thiserror::Error;
 use x11::{xinerama, xlib};
@@ -115,7 +114,7 @@ impl MiniWM {
         unsafe {
             let mut num: i32 = 0;
             let screen_pointers = xinerama::XineramaQueryScreens(self.display, &mut num);
-            let screens = from_raw_parts(screen_pointers, num as usize).to_vec();
+            let screens = slice::from_raw_parts(screen_pointers, num as usize).to_vec();
             let screen = screens.get(0);
 
             if let Some(screen) = screen {
