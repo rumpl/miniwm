@@ -1,0 +1,2 @@
+startup:
+  - hsetroot -cover ~/Pictures/nord-lake.png
