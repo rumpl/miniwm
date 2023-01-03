@@ -42,6 +42,16 @@ impl MiniWM {
                 xlib::XDefaultRootWindow(self.display),
                 xlib::SubstructureRedirectMask | xlib::SubstructureNotifyMask,
             );
+
+            xlib::XGrabKey(
+                self.display,
+                xlib::AnyKey,
+                xlib::ControlMask,
+                xlib::XDefaultRootWindow(self.display),
+                0,
+                xlib::GrabModeAsync,
+                xlib::GrabModeAsync,
+            );
         }
 
         Ok(())
@@ -60,12 +70,21 @@ impl MiniWM {
                     xlib::UnmapNotify => {
                         self.remove_window(event)?;
                     }
+                    xlib::KeyPress => {
+                        self.handle_keypress(event)?;
+                    }
                     _ => {
                         println!("unknown event {:?}", event);
                     }
                 }
             }
         }
+    }
+
+    fn handle_keypress(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
+        let event: xlib::XKeyEvent = From::from(event);
+        println!("got control+{}", event.keycode);
+        Ok(())
     }
 
     fn remove_window(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
