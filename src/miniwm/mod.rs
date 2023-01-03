@@ -90,19 +90,19 @@ impl MiniWM {
 
         let (width, height) = self.get_screen_size()?;
 
-        let win_width = width as usize / self.windows.len();
+        let win_width = width as i32 / self.windows.len() as i32;
 
         let mut start = 0;
         self.windows.iter().for_each(|window| {
-            self.move_window(*window, start, 0_u32);
+            self.move_window(*window, start, 0_i32);
             self.resize_window(*window, win_width as u32, height as u32);
-            start += win_width as u32;
+            start += win_width;
         });
 
         Ok(())
     }
 
-    fn move_window(&self, window: Window, x: u32, y: u32) {
+    fn move_window(&self, window: Window, x: i32, y: i32) {
         unsafe { xlib::XMoveWindow(self.display, window, x as i32, y as i32) };
     }
 
