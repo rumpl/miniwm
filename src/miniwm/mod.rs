@@ -103,7 +103,7 @@ impl MiniWM {
     }
 
     fn move_window(&self, window: Window, x: i32, y: i32) {
-        unsafe { xlib::XMoveWindow(self.display, window, x as i32, y as i32) };
+        unsafe { xlib::XMoveWindow(self.display, window, x, y) };
     }
 
     fn resize_window(&self, window: Window, width: u32, height: u32) {
