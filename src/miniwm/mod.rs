@@ -1,5 +1,8 @@
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::mem::zeroed;
 use std::ptr::null;
+use std::rc::Rc;
 use std::{collections::BTreeSet, slice};
 
 use thiserror::Error;
@@ -16,9 +19,32 @@ pub enum MiniWMError {
 
 pub type Window = u64;
 
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
+struct Workspace {
+    windows: BTreeSet<Window>,
+}
+
+impl Workspace {
+    fn new() -> Self {
+        Workspace {
+            windows: BTreeSet::new(),
+        }
+    }
+
+    fn add_window(&mut self, window: Window) {
+        self.windows.insert(window);
+    }
+
+    fn remove_window(&mut self, window: &Window) {
+        self.windows.remove(window);
+    }
+}
+
 pub struct MiniWM {
     display: *mut xlib::Display,
     windows: BTreeSet<Window>,
+    workspaces: BTreeMap<u32, Rc<RefCell<Workspace>>>,
+    current_workspace: Rc<RefCell<Workspace>>,
 }
 
 impl MiniWM {
@@ -29,9 +55,16 @@ impl MiniWM {
             return Err(MiniWMError::DisplayNotFound);
         }
 
+        let mut workspaces = BTreeMap::new();
+        let workspace = Rc::new(RefCell::new(Workspace::new()));
+        let current_workspace = Rc::clone(&workspace);
+        workspaces.insert(0, workspace);
+
         Ok(MiniWM {
             display,
             windows: BTreeSet::new(),
+            workspaces,
+            current_workspace,
         })
     }
 
@@ -41,6 +74,16 @@ impl MiniWM {
                 self.display,
                 xlib::XDefaultRootWindow(self.display),
                 xlib::SubstructureRedirectMask | xlib::SubstructureNotifyMask,
+            );
+
+            xlib::XGrabKey(
+                self.display,
+                xlib::AnyKey,
+                xlib::Mod4Mask,
+                xlib::XDefaultRootWindow(self.display),
+                0,
+                xlib::GrabModeAsync,
+                xlib::GrabModeAsync,
             );
         }
 
@@ -60,22 +103,24 @@ impl MiniWM {
                     xlib::UnmapNotify => {
                         self.remove_window(event)?;
                     }
+                    xlib::KeyPress => {
+                        self.handle_keypress(event)?;
+                    }
+                    xlib::KeyRelease => {}
                     _ => {
-                        println!("unknown event {:?}", event);
+                        // println!("unknown event {:?}", event);
                     }
                 }
             }
         }
     }
 
-    fn remove_window(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
-        let event: xlib::XUnmapEvent = From::from(event);
-        self.windows.remove(&event.window);
-        self.layout()
-    }
-
     fn create_window(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
         let event: xlib::XMapRequestEvent = From::from(event);
+
+        self.current_workspace
+            .borrow_mut()
+            .add_window(event.window as Window);
         self.windows.insert(event.window as Window);
         self.layout()?;
         unsafe { xlib::XMapRaised(self.display, event.window) };
@@ -83,23 +128,78 @@ impl MiniWM {
         Ok(())
     }
 
+    fn remove_window(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
+        let event: xlib::XUnmapEvent = From::from(event);
+        self.current_workspace
+            .borrow_mut()
+            .remove_window(&event.window as &Window);
+        self.windows.remove(&event.window);
+
+        self.layout()
+    }
+
+    fn handle_keypress(&mut self, event: xlib::XEvent) -> Result<(), MiniWMError> {
+        let event: xlib::XKeyEvent = From::from(event);
+
+        if let 10..=19 = event.keycode {
+            let ws = event.keycode - 10;
+            if let Some(workspace) = self.workspaces.get(&ws) {
+                self.current_workspace
+                    .borrow()
+                    .windows
+                    .iter()
+                    .for_each(|window| {
+                        self.hide_window(*window);
+                    });
+                self.current_workspace = Rc::clone(workspace);
+                self.layout()?;
+            } else {
+                self.current_workspace
+                    .borrow()
+                    .windows
+                    .iter()
+                    .for_each(|window| {
+                        self.hide_window(*window);
+                    });
+                let workspace = Rc::new(RefCell::new(Workspace::new()));
+                self.current_workspace = Rc::clone(&workspace);
+                self.workspaces.insert(ws, workspace);
+                self.layout()?;
+            }
+
+            self.layout()?;
+            println!("got control+{}", event.keycode);
+        }
+        Ok(())
+    }
+
     fn layout(&mut self) -> Result<(), MiniWMError> {
-        if self.windows.is_empty() {
+        let ws = self.current_workspace.borrow();
+        if ws.windows.is_empty() {
             return Ok(());
         }
 
         let (width, height) = self.get_screen_size()?;
 
-        let win_width = width as i32 / self.windows.len() as i32;
+        let win_width = width as i32 / ws.windows.len() as i32;
 
         let mut start = 0;
-        self.windows.iter().for_each(|window| {
+        ws.windows.iter().for_each(|window| {
             self.move_window(*window, start, 0_i32);
             self.resize_window(*window, win_width as u32, height as u32);
+            self.show_window(*window);
             start += win_width;
         });
 
         Ok(())
+    }
+
+    fn show_window(&self, window: Window) {
+        unsafe { xlib::XMapWindow(self.display, window) };
+    }
+
+    fn hide_window(&self, window: Window) {
+        unsafe { xlib::XUnmapWindow(self.display, window) };
     }
 
     fn move_window(&self, window: Window, x: i32, y: i32) {
