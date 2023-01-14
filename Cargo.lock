@@ -100,6 +100,7 @@ dependencies = [
  "execute",
  "thiserror",
  "x11",
+ "xlib",
 ]
 
 [[package]]
@@ -228,4 +229,12 @@ checksum = "c2638d5b9c17ac40575fb54bb461a4b1d2a8d1b4ffcc4ff237d254ec59ddeb82"
 dependencies = [
  "libc",
  "pkg-config",
+]
+
+[[package]]
+name = "xlib"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+ "x11",
 ]

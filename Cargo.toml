@@ -9,3 +9,4 @@ thiserror = "1.0.38"
 x11 = { version = "2.20.1", features = ["xlib", "xinerama"] }
 config = { path = "config" }
 execute = "0.2.11"
+xlib = { path = "xlib" }
